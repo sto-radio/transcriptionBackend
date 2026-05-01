@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper
+  namespace: default
+  labels:
+    app: whisper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whisper
+  template:
+    metadata:
+      labels:
+        app: whisper
+    spec:
+      securityContext:
+        fsGroup: 1000  # UID de appuser para compatibilidad con SMB/CIFS
+      initContainers:
+      - name: download-models
+        image: dockerregistry.csrdigas.es/whisper:v0.5  # Cambia esto al nombre de tu imagen
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-c", "import whisperx; whisperx.load_model('base', device='cpu', compute_type='int8')"]
+        env:
+        - name: XDG_CACHE_HOME
+          value: "/home/appuser/.cache"
+        - name: HOME
+          value: "/home/appuser"
+        volumeMounts:
+        - name: docker
+          mountPath: /home/appuser
+          subpath: kube/whisper/home
+        - name: docker
+          mountPath: /app
+          subpath: kube/whisper/app
+      containers:
+      - name: whisper
+        image: dockerregistry.csrdigas.es/whisper:v0.5  # Cambia esto al nombre de tu imagen
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: docker
+          mountPath: /home/appuser
+          subpath: kube/whisper/home
+        - name: docker
+          mountPath: /app
+          subpath: kube/whisper/app
+      imagePullSecrets:
+        - name: dockerregistry
+      dnsPolicy: ClusterFirst
+      nodeName: kubeworker3
+      volumes:
+      - name: docker
+        persistentVolumeClaim:
+          claimName: docker-pvc  # Cambia esto al nombre de tu PVC
+      restartPolicy: Always
+

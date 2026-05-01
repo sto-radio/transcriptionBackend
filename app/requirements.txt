@@ -1,0 +1,6 @@
+fastapi>=0.95.0
+uvicorn>=0.21.0
+whisperx>=1.0
+torch>=2.0.0
+python-multipart
+pytz

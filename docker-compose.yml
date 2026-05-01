@@ -1,0 +1,43 @@
+services:
+  whisper:
+    image: dockerregistry.csrdigas.es/whisper:v0.5
+    container_name: whisper-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - XDG_CACHE_HOME=/home/appuser/.cache
+      - HOME=/home/appuser
+      - API_KEY=pruebakey
+    volumes:
+      - ./home:/home/appuser
+      - ./app:/app
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    runtime: nvidia
+    networks:
+      - whisper-network
+
+  model-downloader:
+    image: dockerregistry.csrdigas.es/whisper:v0.5
+    container_name: whisper-model-downloader
+    profiles: ["setup"]   # solo se ejecuta si activas este profile
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - XDG_CACHE_HOME=/home/appuser/.cache
+      - HOME=/home/appuser
+    volumes:
+      - ./home:/home/appuser
+      - ./app:/app
+    command: ["/app/entrypoint.sh","python", "-c", "import whisperx; whisperx.load_model('medium', device='cuda', compute_type='float16')"]
+    networks:
+      - whisper-network
+
+networks:
+  whisper-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
