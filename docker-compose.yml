@@ -1,39 +1,73 @@
 services:
   whisper:
-    image: dockerregistry.csrdigas.es/whisper:v0.5
+    image: dockerregistry.csrdigas.es/whisper:v1.1
     container_name: whisper-service
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
     ports:
       - "8000:8000"
     environment:
       - CUDA_VISIBLE_DEVICES=0
+      - WHISPERX_DEVICE=cuda
+      - WHISPERX_MODEL=${WHISPERX_MODEL:-medium}
+      - WHISPERX_COMPUTE_TYPE=${WHISPERX_COMPUTE_TYPE:-int8_float16}
+      - WHISPERX_BATCH_SIZE=${WHISPERX_BATCH_SIZE:-2}
       - XDG_CACHE_HOME=/home/appuser/.cache
       - HOME=/home/appuser
+      - NLTK_DATA=/home/appuser/nltk_data
       - API_KEY=pruebakey
+      - HF_TOKEN=${HF_TOKEN:-}
+      - WHISPERX_DIARIZATION_MODEL=${WHISPERX_DIARIZATION_MODEL:-pyannote/speaker-diarization-3.1}
+      - NVIDIA_VISIBLE_DEVICES=0
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
-      - ./home:/home/appuser
-      - ./app:/app
+      - /mnt/docker/whisper/models:/home/appuser
+      - /mnt/docker/whisper/tmp:/tmp/whisper
     security_opt:
       - no-new-privileges:true
     user: "1000:1000"
-    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
     networks:
       - whisper-network
 
   model-downloader:
-    image: dockerregistry.csrdigas.es/whisper:v0.5
+    image: dockerregistry.csrdigas.es/whisper:v1.1
     container_name: whisper-model-downloader
     profiles: ["setup"]   # solo se ejecuta si activas este profile
+    dns:
+      - 1.1.1.1
     environment:
       - CUDA_VISIBLE_DEVICES=0
+      - WHISPERX_DEVICE=cuda
+      - WHISPERX_MODEL=${WHISPERX_MODEL:-medium}
+      - WHISPERX_COMPUTE_TYPE=${WHISPERX_COMPUTE_TYPE:-int8_float16}
+      - WHISPERX_BATCH_SIZE=${WHISPERX_BATCH_SIZE:-2}
+      - WHISPERX_PRELOAD_DIARIZATION=${WHISPERX_PRELOAD_DIARIZATION:-true}
+      - WHISPERX_PRELOAD_ALIGN_LANGUAGES=${WHISPERX_PRELOAD_ALIGN_LANGUAGES:-}
       - XDG_CACHE_HOME=/home/appuser/.cache
       - HOME=/home/appuser
+      - NLTK_DATA=/home/appuser/nltk_data
+      - HF_TOKEN=${HF_TOKEN:-}
+      - WHISPERX_DIARIZATION_MODEL=${WHISPERX_DIARIZATION_MODEL:-pyannote/speaker-diarization-3.1}
     volumes:
-      - ./home:/home/appuser
-      - ./app:/app
-    command: ["/app/entrypoint.sh","python", "-c", "import whisperx; whisperx.load_model('medium', device='cuda', compute_type='float16')"]
+      - /mnt/docker/whisper/models:/home/appuser
+    command: ["bash", "/app/entrypoint.sh", "python3", "/app/preload_models.py"]
     networks:
       - whisper-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
 
 networks:
   whisper-network:

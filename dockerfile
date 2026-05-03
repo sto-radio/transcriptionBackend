@@ -1,29 +1,33 @@
-FROM python:3.9-slim
+FROM nvidia/cuda:13.0.3-cudnn-runtime-ubuntu22.04
 
-# Instala dependencias del sistema (FFmpeg para Whisper)
-RUN apt-get update && apt-get install -y ffmpeg prelink && rm -rf /var/lib/apt/lists/*
-
-# Crea usuario y directorios seguros
-RUN useradd -m appuser && \
-    mkdir -p /home/appuser/.cache /home/appuser/.config && \
-    chown -R appuser:appuser /home/appuser
-
-# Variables de entorno para cachés
-ENV XDG_CACHE_HOME=/home/appuser/.cache \
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    XDG_CACHE_HOME=/home/appuser/.cache \
+    NLTK_DATA=/home/appuser/nltk_data \
     XDG_CONFIG_HOME=/home/appuser/.config \
-    HOME=/home/appuser \
-    PIP_CACHE_DIR=/app/cache
+    HOME=/home/appuser
+
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    ffmpeg \
+    libsndfile1 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m appuser && mkdir -p /app /home/appuser/.cache /home/appuser/.config /home/appuser/nltk_data \
+    && chown -R appuser:appuser /app /home/appuser
 
 WORKDIR /app
 
-# Crea directorios para caché y paquetes
-RUN mkdir -p /app/cache /app/packages && chown -R appuser:appuser /app/cache /app/packages
-
-# 4. Copia requirements ANTES del código (para mejor caching de capas)
 COPY --chown=appuser:appuser app/requirements.txt .
+RUN pip3 install --upgrade pip \
+    && pip3 install -r requirements.txt
 
 COPY --chown=appuser:appuser app/ .
+RUN chmod +x /app/entrypoint.sh /app/entrypoint-init.sh
+
 USER appuser
 
-CMD ["/app/entrypoint.sh"]
-#CMD ["tail", "-f", "/dev/null"]
+CMD ["bash", "/app/entrypoint.sh"]
