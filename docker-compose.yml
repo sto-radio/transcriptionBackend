@@ -7,6 +7,12 @@ services:
       - 10.236.203.11
     ports:
       - "8000:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whisper.rule=Host(`whisper.example.com`)"
+      - "traefik.http.routers.whisper.entrypoints=websecure"
+      - "traefik.http.routers.whisper.tls=true"
+      - "traefik.http.services.whisper.loadbalancer.server.port=8000"
     environment:
       - CUDA_VISIBLE_DEVICES=0
       - WHISPERX_DEVICE=cuda
