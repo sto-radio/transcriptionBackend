@@ -4,15 +4,15 @@ services:
     container_name: whisper-service
     restart: unless-stopped
     dns:
-      - 1.1.1.1
+      - 10.236.203.11
     ports:
       - "8000:8000"
     environment:
       - CUDA_VISIBLE_DEVICES=0
       - WHISPERX_DEVICE=cuda
-      - WHISPERX_MODEL=${WHISPERX_MODEL:-medium}
+      - WHISPERX_MODEL=${WHISPERX_MODEL:-large-v3}
       - WHISPERX_COMPUTE_TYPE=${WHISPERX_COMPUTE_TYPE:-int8_float16}
-      - WHISPERX_BATCH_SIZE=${WHISPERX_BATCH_SIZE:-2}
+      - WHISPERX_BATCH_SIZE=${WHISPERX_BATCH_SIZE:-1}
       - XDG_CACHE_HOME=/home/appuser/.cache
       - HOME=/home/appuser
       - NLTK_DATA=/home/appuser/nltk_data
@@ -35,20 +35,20 @@ services:
               device_ids: ["0"]
               capabilities: [gpu]
     networks:
-      - whisper-network
+      - traefik_default
 
   model-downloader:
     image: dockerregistry.csrdigas.es/whisper:v1.1
     container_name: whisper-model-downloader
     profiles: ["setup"]   # solo se ejecuta si activas este profile
     dns:
-      - 1.1.1.1
+      - 10.236.203.11
     environment:
       - CUDA_VISIBLE_DEVICES=0
       - WHISPERX_DEVICE=cuda
-      - WHISPERX_MODEL=${WHISPERX_MODEL:-medium}
+      - WHISPERX_MODEL=${WHISPERX_MODEL:-large-v3}
       - WHISPERX_COMPUTE_TYPE=${WHISPERX_COMPUTE_TYPE:-int8_float16}
-      - WHISPERX_BATCH_SIZE=${WHISPERX_BATCH_SIZE:-2}
+      - WHISPERX_BATCH_SIZE=${WHISPERX_BATCH_SIZE:-1}
       - WHISPERX_PRELOAD_DIARIZATION=${WHISPERX_PRELOAD_DIARIZATION:-true}
       - WHISPERX_PRELOAD_ALIGN_LANGUAGES=${WHISPERX_PRELOAD_ALIGN_LANGUAGES:-}
       - XDG_CACHE_HOME=/home/appuser/.cache
@@ -60,7 +60,7 @@ services:
       - /mnt/docker/whisper/models:/home/appuser
     command: ["bash", "/app/entrypoint.sh", "python3", "/app/preload_models.py"]
     networks:
-      - whisper-network
+      - traefik_default
     deploy:
       resources:
         reservations:
@@ -70,8 +70,5 @@ services:
               capabilities: [gpu]
 
 networks:
-  whisper-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
+  traefik_default:
+    external: true
