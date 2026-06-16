@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.whisper.rule=Host(`whisper.example.com`)"
+      - "traefik.http.routers.whisper.rule=Host(`${WHISPER_HOST:-whisper.csrdigas.es}`)"
       - "traefik.http.routers.whisper.entrypoints=websecure"
       - "traefik.http.routers.whisper.tls=true"
       - "traefik.http.services.whisper.loadbalancer.server.port=8000"
@@ -23,6 +23,7 @@ services:
       - HOME=/home/appuser
       - NLTK_DATA=/home/appuser/nltk_data
       - API_KEY=pruebakey
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-https://cae.csrdigas.es}
       - HF_TOKEN=${HF_TOKEN:-}
       - WHISPERX_DIARIZATION_MODEL=${WHISPERX_DIARIZATION_MODEL:-pyannote/speaker-diarization-3.1}
       - NVIDIA_VISIBLE_DEVICES=0

@@ -1,13 +1,11 @@
-from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks, Form, File, Depends, APIRouter, Security, status
-from fastapi.security import APIKeyHeader
-from datetime import datetime, timezone
+from fastapi import FastAPI, UploadFile, HTTPException, Form, File, Depends, Header, status
+from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import whisperx
 import torch
 import json
 import uuid
-import io
 import time
 import pytz
 import tempfile
@@ -21,6 +19,8 @@ device = os.getenv("WHISPERX_DEVICE", "cuda")  # o "cpu"
 diarization_model = None
 diarization_model_name = None
 diarization_model_lock = threading.Lock()
+UPLOAD_CHUNK_SIZE = int(os.getenv("UPLOAD_CHUNK_SIZE", str(1024 * 1024)))
+WHISPER_TMP_DIR = os.getenv("WHISPER_TMP_DIR", "/tmp/whisper")
 
 WHISPERX_MODEL = os.getenv("WHISPERX_MODEL", "medium")
 WHISPERX_COMPUTE_TYPE = os.getenv("WHISPERX_COMPUTE_TYPE", "int8_float16")
@@ -33,19 +33,36 @@ HF_TOKEN_ENV_NAMES = (
     "HUGGING_FACE_HUB_TOKEN",
     "PYANNOTE_AUTH_TOKEN",
 )
+CORS_ALLOW_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOW_ORIGINS", "*").split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_credentials="*" not in CORS_ALLOW_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 API_KEY = os.getenv("API_KEY", "pruebakey")  # podría venir de env vars o DB
-api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
 
-async def validate_api_key(key: str = Security(api_key_header)):
+def get_authorization_token(authorization: str | None):
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and token:
+        return token.strip()
+    return authorization.strip()
+
+
+async def validate_api_key(
+    x_api_key: str | None = Header(default=None, alias="X-API-KEY"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+):
+    key = x_api_key or get_authorization_token(authorization)
     if not key or key != API_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -53,8 +70,6 @@ async def validate_api_key(key: str = Security(api_key_header)):
         )
     return key
 
-router = APIRouter(dependencies=[Depends(validate_api_key)])
-app.include_router(router)
 # 1. Carga del modelo WhisperX
 model = whisperx.load_model(
     WHISPERX_MODEL,
@@ -63,20 +78,17 @@ model = whisperx.load_model(
 )
 
 
-def process_audio(job_id: str, audio: bytes, config: dict):
-    #buffer = io.BytesIO(audio_bytes)
-    #buffer.name = "audio.wav"
+def process_audio(job_id: str, audio_path: str, config: dict):
     start = time.perf_counter()
     created_at = jobs[job_id]["created_at"]
 
-    # Guardar bytes en archivo temporal
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav", dir="/tmp/whisper") as tmp:
-        tmp.write(audio)
-        tmp_path = tmp.name
     try:
-        result = whisper_transcribe(tmp_path, job_id, created_at,
+        result = whisper_transcribe(
+            audio_path,
+            job_id,
+            created_at,
             jobs[job_id]["data_name"],
-            jobs[job_id]["config"]
+            config,
         )
         end = time.perf_counter()
         jobs[job_id]["status"] = "done"
@@ -85,20 +97,38 @@ def process_audio(job_id: str, audio: bytes, config: dict):
     except Exception as exc:
         jobs[job_id]["status"] = "failed"
         jobs[job_id]["error"] = str(exc)
-        raise
+        print(f"Job {job_id} failed: {exc}", flush=True)
     finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
 
-@app.post("/v2/jobs")
+
+def get_upload_suffix(filename: str | None):
+    _, suffix = os.path.splitext(filename or "")
+    return suffix or ".audio"
+
+
+@app.post("/v2/jobs", dependencies=[Depends(validate_api_key)])
 async def create_job(
-    background_tasks: BackgroundTasks,
     data_file: UploadFile = File(...),
     config: str = Form(...)
 ):
+    tmp_path = None
     try:
         config_dict = json.loads(config)
-        audio = await data_file.read()
+        os.makedirs(WHISPER_TMP_DIR, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=get_upload_suffix(data_file.filename),
+            dir=WHISPER_TMP_DIR,
+        ) as tmp:
+            tmp_path = tmp.name
+            while True:
+                chunk = await data_file.read(UPLOAD_CHUNK_SIZE)
+                if not chunk:
+                    break
+                tmp.write(chunk)
+
         job_id = str(uuid.uuid4().int >> (128 - 64))
         utc = pytz.UTC
         created = datetime.now(utc).isoformat()
@@ -112,13 +142,21 @@ async def create_job(
             "config": config_dict,
             "type": "transcription"
         }
-        background_tasks.add_task(process_audio, job_id, audio, config_dict)
+        threading.Thread(
+            target=process_audio,
+            args=(job_id, tmp_path, config_dict),
+            daemon=True,
+        ).start()
     except json.JSONDecodeError as e:
         return {"error": f"Invalid JSON in config: {e}"}
+    except Exception:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
     
     return {"id": job_id}
     
-@app.get("/v2/jobs/{job_id}")
+@app.get("/v2/jobs/{job_id}", dependencies=[Depends(validate_api_key)])
 def get_job(job_id: str):
     job = jobs.get(job_id)
     if not job:
@@ -138,7 +176,7 @@ def get_job(job_id: str):
         response["job"]["error"] = job["error"]
     return response
 
-@app.get("/v2/jobs/{job_id}/transcript")
+@app.get("/v2/jobs/{job_id}/transcript", dependencies=[Depends(validate_api_key)])
 def get_job_transcript(job_id: str):
     job = jobs.get(job_id)
     if not job:
