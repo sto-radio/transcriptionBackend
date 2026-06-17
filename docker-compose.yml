@@ -20,6 +20,11 @@ services:
       - WHISPERX_COMPUTE_TYPE=${WHISPERX_COMPUTE_TYPE:-int8_float16}
       - WHISPERX_BATCH_SIZE=${WHISPERX_BATCH_SIZE:-1}
       - XDG_CACHE_HOME=/home/appuser/.cache
+      - HF_HOME=/home/appuser/.cache/huggingface
+      - HF_HUB_CACHE=/home/appuser/.cache/huggingface/hub
+      - TORCH_HOME=/home/appuser/.cache/torch
+      - XDG_CONFIG_HOME=/home/appuser/.config
+      - MPLCONFIGDIR=/home/appuser/.config/matplotlib
       - HOME=/home/appuser
       - NLTK_DATA=/home/appuser/nltk_data
       - API_KEY=pruebakey
@@ -62,10 +67,16 @@ services:
       - WHISPERX_PRELOAD_DIARIZATION=${WHISPERX_PRELOAD_DIARIZATION:-true}
       - WHISPERX_PRELOAD_ALIGN_LANGUAGES=${WHISPERX_PRELOAD_ALIGN_LANGUAGES:-}
       - XDG_CACHE_HOME=/home/appuser/.cache
+      - HF_HOME=/home/appuser/.cache/huggingface
+      - HF_HUB_CACHE=/home/appuser/.cache/huggingface/hub
+      - TORCH_HOME=/home/appuser/.cache/torch
+      - XDG_CONFIG_HOME=/home/appuser/.config
+      - MPLCONFIGDIR=/home/appuser/.config/matplotlib
       - HOME=/home/appuser
       - NLTK_DATA=/home/appuser/nltk_data
       - HF_TOKEN=${HF_TOKEN:-}
       - WHISPERX_DIARIZATION_MODEL=${WHISPERX_DIARIZATION_MODEL:-pyannote/speaker-diarization-3.1}
+      - WHISPERX_PRELOAD_MODEL=${WHISPERX_PRELOAD_MODEL:-true}
       - AUDIO_CLEANING_PRELOAD_DEEPFILTER=${AUDIO_CLEANING_PRELOAD_DEEPFILTER:-true}
       - AUDIO_CLEANING_DEEPFILTER_MODEL=${AUDIO_CLEANING_DEEPFILTER_MODEL:-DeepFilterNet3}
     volumes:

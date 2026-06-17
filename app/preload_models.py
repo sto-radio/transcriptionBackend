@@ -68,6 +68,18 @@ def preload_deepfilter_model():
     clear_gpu_cache()
 
 
+def preload_whisper_model(device, model_name, compute_type):
+    preload_whisper = parse_bool(os.getenv("WHISPERX_PRELOAD_MODEL"), True)
+    if not preload_whisper:
+        print("No se precarga WhisperX porque WHISPERX_PRELOAD_MODEL=false.")
+        return
+
+    print(f"Precargando modelo WhisperX '{model_name}' en {device}...")
+    model = whisperx.load_model(model_name, device=device, compute_type=compute_type)
+    del model
+    clear_gpu_cache()
+
+
 def main():
     device = os.getenv("WHISPERX_DEVICE", "cuda")
     model_name = os.getenv("WHISPERX_MODEL", "medium")
@@ -79,10 +91,7 @@ def main():
 
     ensure_nltk_data()
 
-    print(f"Precargando modelo WhisperX '{model_name}' en {device}...")
-    model = whisperx.load_model(model_name, device=device, compute_type=compute_type)
-    del model
-    clear_gpu_cache()
+    preload_whisper_model(device, model_name, compute_type)
 
     align_languages = os.getenv("WHISPERX_PRELOAD_ALIGN_LANGUAGES", "")
     for language in [lang.strip() for lang in align_languages.split(",") if lang.strip()]:
