@@ -11,6 +11,12 @@ from datetime import datetime
 import pytz
 import torch
 import whisperx
+from audio_cleaning import (
+    clean_audio_file,
+    parse_audio_cleaning_config,
+    parse_audio_cleaning_request_config,
+)
+from auphonic_compat import create_auphonic_router
 from diarization import (
     apply_diarization,
     normalize_speaker_segments,
@@ -139,10 +145,21 @@ def queue_dispatcher():
 
 def run_queued_job(job_id, audio_path):
     try:
-        process_audio_file(job_id, audio_path)
+        if get_job_type(job_id) == "audio_cleaning":
+            process_audio_cleaning_file(job_id, audio_path)
+        else:
+            process_audio_file(job_id, audio_path)
     finally:
         release_gpu_slot()
         job_queue.task_done()
+
+
+def get_job_type(job_id):
+    with jobs_lock:
+        job = jobs.get(job_id)
+        if not job:
+            return None
+        return job.get("type")
 
 
 def mark_job_failed(job_id, exc):
@@ -181,6 +198,19 @@ def save_audio_to_temp(audio: bytes, filename: str):
         return tmp.name
 
 
+app.include_router(
+    create_auphonic_router(
+        api_key=API_KEY,
+        jobs=jobs,
+        jobs_lock=jobs_lock,
+        job_queue=job_queue,
+        save_audio_to_temp=save_audio_to_temp,
+        cleanup_audio_file=cleanup_audio_file,
+        temp_audio_dir=TEMP_AUDIO_DIR,
+    )
+)
+
+
 def process_audio_file(job_id: str, audio_path: str):
     start = time.perf_counter()
 
@@ -204,6 +234,29 @@ def process_audio_file(job_id: str, audio_path: str):
             jobs[job_id]["status"] = "done"
             jobs[job_id]["duration"] = int(round(end - start))
             jobs[job_id]["result"] = result
+    except Exception as exc:
+        mark_job_failed(job_id, exc)
+        raise
+    finally:
+        cleanup_audio_file(audio_path)
+
+
+def process_audio_cleaning_file(job_id: str, audio_path: str):
+    start = time.perf_counter()
+
+    with jobs_lock:
+        job = jobs[job_id]
+        job["status"] = "running"
+        config = job["config"]
+        output_path = job.get("output_path")
+
+    try:
+        result = clean_audio_file(audio_path, output_path=output_path, config=config)
+        end = time.perf_counter()
+        with jobs_lock:
+            jobs[job_id]["status"] = "done"
+            jobs[job_id]["duration"] = int(round(end - start))
+            jobs[job_id]["result"] = result.to_dict()
     except Exception as exc:
         mark_job_failed(job_id, exc)
         raise
@@ -242,6 +295,46 @@ async def create_job(
         job_queue.put((job_id, tmp_path))
     except json.JSONDecodeError as e:
         return {"error": f"Invalid JSON in config: {e}"}
+    except Exception:
+        cleanup_audio_file(tmp_path)
+        raise
+
+    return {"id": job_id}
+
+
+@app.post("/v2/audio-cleaning/jobs")
+async def create_audio_cleaning_job(
+    data_file: UploadFile = File(...),
+    config: str = Form(...),
+):
+    tmp_path = None
+    try:
+        config_dict = parse_audio_cleaning_request_config(config)
+        cleaning_config = parse_audio_cleaning_config(config_dict)
+        audio = await data_file.read()
+        job_id = str(uuid.uuid4().int >> (128 - 64))
+        utc = pytz.UTC
+        created = datetime.now(utc).isoformat()
+        tmp_path = save_audio_to_temp(audio, data_file.filename)
+
+        with jobs_lock:
+            jobs[job_id] = {
+                "id": job_id,
+                "status": "queued",
+                "created_at": created,
+                "data_name": data_file.filename,
+                "duration": 0,
+                "config": {
+                    "audio_cleaning_config": cleaning_config.to_dict(),
+                    "request": config_dict,
+                },
+                "type": "audio_cleaning",
+            }
+
+        job_queue.put((job_id, tmp_path))
+    except ValueError as exc:
+        cleanup_audio_file(tmp_path)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception:
         cleanup_audio_file(tmp_path)
         raise

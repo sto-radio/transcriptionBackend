@@ -1,6 +1,6 @@
 services:
   whisper:
-    image: dockerregistry.csrdigas.es/whisper:v1.1
+    image: dockerregistry.csrdigas.es/whisper:v1.2
     container_name: whisper-service
     restart: unless-stopped
     dns:
@@ -25,6 +25,10 @@ services:
       - API_KEY=pruebakey
       - HF_TOKEN=${HF_TOKEN:-}
       - WHISPERX_DIARIZATION_MODEL=${WHISPERX_DIARIZATION_MODEL:-pyannote/speaker-diarization-3.1}
+      - AUDIO_CLEANING_DEEPFILTER_MODEL=${AUDIO_CLEANING_DEEPFILTER_MODEL:-DeepFilterNet3}
+      - AUDIO_CLEANING_NOISE_ATTENUATION_PERCENT=${AUDIO_CLEANING_NOISE_ATTENUATION_PERCENT:-100}
+      - AUDIO_CLEANING_TARGET_LOUDNESS_LUFS=${AUDIO_CLEANING_TARGET_LOUDNESS_LUFS:--16}
+      - AUDIO_CLEANING_TRUE_PEAK_DB=${AUDIO_CLEANING_TRUE_PEAK_DB:--1.5}
       - NVIDIA_VISIBLE_DEVICES=0
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
@@ -44,7 +48,7 @@ services:
       - traefik_default
 
   model-downloader:
-    image: dockerregistry.csrdigas.es/whisper:v1.1
+    image: dockerregistry.csrdigas.es/whisper:v1.2
     container_name: whisper-model-downloader
     profiles: ["setup"]   # solo se ejecuta si activas este profile
     dns:
@@ -62,6 +66,8 @@ services:
       - NLTK_DATA=/home/appuser/nltk_data
       - HF_TOKEN=${HF_TOKEN:-}
       - WHISPERX_DIARIZATION_MODEL=${WHISPERX_DIARIZATION_MODEL:-pyannote/speaker-diarization-3.1}
+      - AUDIO_CLEANING_PRELOAD_DEEPFILTER=${AUDIO_CLEANING_PRELOAD_DEEPFILTER:-true}
+      - AUDIO_CLEANING_DEEPFILTER_MODEL=${AUDIO_CLEANING_DEEPFILTER_MODEL:-DeepFilterNet3}
     volumes:
       - /mnt/docker/whisper/models:/home/appuser
     command: ["bash", "/app/entrypoint.sh", "python3", "/app/preload_models.py"]

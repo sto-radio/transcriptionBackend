@@ -43,6 +43,31 @@ def ensure_nltk_data():
         nltk.download(package, download_dir=nltk_data_dir, quiet=False)
 
 
+def preload_deepfilter_model():
+    preload_deepfilter = parse_bool(
+        os.getenv("AUDIO_CLEANING_PRELOAD_DEEPFILTER"),
+        True,
+    )
+    if not preload_deepfilter:
+        return
+
+    model_name = os.getenv("AUDIO_CLEANING_DEEPFILTER_MODEL", "DeepFilterNet3")
+    post_filter = parse_bool(os.getenv("AUDIO_CLEANING_POST_FILTER"), True)
+
+    print(f"Precargando modelo DeepFilterNet '{model_name}'...")
+    from df.enhance import init_df
+
+    model, df_state, _, _ = init_df(
+        model_name,
+        post_filter=post_filter,
+        log_level="ERROR",
+        log_file=None,
+    )
+    del model
+    del df_state
+    clear_gpu_cache()
+
+
 def main():
     device = os.getenv("WHISPERX_DEVICE", "cuda")
     model_name = os.getenv("WHISPERX_MODEL", "medium")
@@ -81,6 +106,8 @@ def main():
         clear_gpu_cache()
     elif preload_diarization:
         print("No se precarga diarizacion porque no hay HF_TOKEN configurado.")
+
+    preload_deepfilter_model()
 
     print("Precarga de modelos completada.")
 
