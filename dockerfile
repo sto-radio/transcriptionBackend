@@ -5,24 +5,27 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     XDG_CACHE_HOME=/home/appuser/.cache \
     NLTK_DATA=/home/appuser/nltk_data \
-    XDG_CONFIG_HOME=/home/appuser/.config \
-    MPLCONFIGDIR=/home/appuser/.config/matplotlib \
+    XDG_CONFIG_HOME=/tmp/app-config \
+    MPLCONFIGDIR=/tmp/matplotlib \
     HOME=/home/appuser \
     TMPDIR=/var/tmp/pip-tmp \
     PIP_CACHE_DIR=/var/cache/pip \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && update-ca-certificates \
+    && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     ffmpeg \
     libsndfile1 \
-    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m appuser \
-    && mkdir -p /app /home/appuser/.cache /home/appuser/.config /home/appuser/nltk_data /var/tmp/pip-tmp /var/cache/pip \
+    && mkdir -p /app /home/appuser/.cache /home/appuser/.config /home/appuser/nltk_data /var/tmp/pip-tmp /var/cache/pip /tmp/app-config /tmp/matplotlib \
     && chmod 1777 /var/tmp/pip-tmp \
+    && chmod 1777 /tmp/app-config /tmp/matplotlib \
     && chown -R appuser:appuser /app /home/appuser
 
 WORKDIR /app

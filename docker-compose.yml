@@ -23,8 +23,8 @@ services:
       - HF_HOME=/home/appuser/.cache/huggingface
       - HF_HUB_CACHE=/home/appuser/.cache/huggingface/hub
       - TORCH_HOME=/home/appuser/.cache/torch
-      - XDG_CONFIG_HOME=/home/appuser/.config
-      - MPLCONFIGDIR=/home/appuser/.config/matplotlib
+      - XDG_CONFIG_HOME=/tmp/app-config
+      - MPLCONFIGDIR=/tmp/matplotlib
       - HOME=/home/appuser
       - NLTK_DATA=/home/appuser/nltk_data
       - API_KEY=pruebakey
@@ -70,8 +70,8 @@ services:
       - HF_HOME=/home/appuser/.cache/huggingface
       - HF_HUB_CACHE=/home/appuser/.cache/huggingface/hub
       - TORCH_HOME=/home/appuser/.cache/torch
-      - XDG_CONFIG_HOME=/home/appuser/.config
-      - MPLCONFIGDIR=/home/appuser/.config/matplotlib
+      - XDG_CONFIG_HOME=/tmp/app-config
+      - MPLCONFIGDIR=/tmp/matplotlib
       - HOME=/home/appuser
       - NLTK_DATA=/home/appuser/nltk_data
       - HF_TOKEN=${HF_TOKEN:-}
