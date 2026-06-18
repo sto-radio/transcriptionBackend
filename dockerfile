@@ -12,6 +12,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_CACHE_DIR=/var/cache/pip \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+RUN mkdir -p /var/tmp/pip-tmp /var/cache/pip \
+    && chmod 1777 /var/tmp/pip-tmp
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && update-ca-certificates \
