@@ -36,6 +36,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from gpu_monitor import gpu_has_capacity
+from torch_compat import allow_trusted_pyannote_checkpoints
 
 app = FastAPI()
 
@@ -80,6 +81,7 @@ async def validate_api_key(key: str = Security(api_key_header)):
 router = APIRouter(dependencies=[Depends(validate_api_key)])
 app.include_router(router)
 # 1. Carga del modelo WhisperX
+allow_trusted_pyannote_checkpoints()
 model = whisperx.load_model(
     WHISPERX_MODEL, device=device, compute_type=WHISPERX_COMPUTE_TYPE
 )

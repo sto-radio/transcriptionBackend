@@ -37,8 +37,8 @@ services:
       - NVIDIA_VISIBLE_DEVICES=0
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
-      - /mnt/docker/whisper/models:/home/appuser
-      - /mnt/docker/whisper/tmp:/tmp/whisper
+      - ./whisper/models:/home/appuser
+      - ./whisper/tmp:/tmp/whisper
     security_opt:
       - no-new-privileges:true
     user: "1000:1000"
@@ -80,7 +80,7 @@ services:
       - AUDIO_CLEANING_PRELOAD_DEEPFILTER=${AUDIO_CLEANING_PRELOAD_DEEPFILTER:-true}
       - AUDIO_CLEANING_DEEPFILTER_MODEL=${AUDIO_CLEANING_DEEPFILTER_MODEL:-DeepFilterNet3}
     volumes:
-      - /mnt/docker/whisper/models:/home/appuser
+      - ./whisper/models:/home/appuser
     command: ["bash", "/app/entrypoint.sh", "python3", "/app/preload_models.py"]
     networks:
       - traefik_default

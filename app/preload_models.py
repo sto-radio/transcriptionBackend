@@ -5,6 +5,7 @@ import nltk
 
 import torch
 import whisperx
+from torch_compat import allow_trusted_pyannote_checkpoints
 
 
 HF_TOKEN_ENV_NAMES = (
@@ -81,6 +82,8 @@ def preload_whisper_model(device, model_name, compute_type):
 
 
 def main():
+    allow_trusted_pyannote_checkpoints()
+
     device = os.getenv("WHISPERX_DEVICE", "cuda")
     model_name = os.getenv("WHISPERX_MODEL", "medium")
     compute_type = os.getenv("WHISPERX_COMPUTE_TYPE", "int8_float16")
