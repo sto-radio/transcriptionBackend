@@ -319,9 +319,12 @@ def whisper_transcribe(audio_file, job_id, created_at, data_name, config_dict):
     # 2. Carga del audio
     audio = whisperx.load_audio(audio_file)
     batch_size = get_transcription_batch_size(config_dict)
+    language = config_dict.get("transcription_config", {}).get("language")
+    transcribe_kwargs = {"batch_size": batch_size}
+    transcribe_kwargs["language"] = language if language else None
 
     # 3. Transcripción y obtención de segmentos
-    result = model.transcribe(audio, batch_size=batch_size)
+    result = model.transcribe(audio, **transcribe_kwargs)
     print("Segmentos iniciales:", result["segments"])
     clear_cuda_cache()
 
